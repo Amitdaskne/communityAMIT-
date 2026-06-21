@@ -4,10 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CommunityAMIT - Thread View</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script type="module" crossorigin src="/assets/post-D8cy54km.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
-  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
 </head>
 <body>
 
@@ -42,5 +49,198 @@
   <div id="nav-placeholder"></div>
 
   <!-- App logic & SDK modules -->
+  <script type="module" src="src/js/app.js"></script>
+  <script type="module">
+    import { ref, get, set, remove, onValue } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const postId = urlParams.get("id");
+
+      if (!postId) {
+        window.App.showToast("No broadcast identifier loaded.", "error");
+        setTimeout(() => { window.location.href = "index.html"; }, 1200);
+        return;
+      }
+
+      const threadContainer = document.getElementById("thread-full-container");
+      const commentsBoxList = document.getElementById("comments-box-list-id");
+      const commentsTitle = document.getElementById("comments-title-id");
+      let currentUid = null;
+
+      onAuthStateChanged(window.App.auth, (user) => {
+        if (user) {
+          currentUid = user.uid;
+        }
+        initThreadListeners();
+      });
+
+      function initThreadListeners() {
+        // Post details listener
+        const postRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}`);
+        onValue(postRef, (snapshot) => {
+          if (!snapshot.exists()) {
+            threadContainer.innerHTML = `
+              <div class="glass-card empty-state">
+                <i data-lucide="shield-alert"></i>
+                <h3>Broadcast Missing</h3>
+                <p>The post was deleted or has been offline.</p>
+              </div>
+            `;
+            window.lucide.createIcons();
+            return;
+          }
+
+          const post = snapshot.val();
+          renderFullThread(post);
+        });
+
+        // Associated comments viewer
+        const commentsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/comments`);
+        onValue(commentsRef, (snapshot) => {
+          commentsBoxList.innerHTML = "";
+          if (!snapshot.exists()) {
+            commentsTitle.textContent = "Discussion replies (0)";
+            commentsBoxList.innerHTML = `
+              <p style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px 0;">No comments found on this post. Be the first to start the chain.</p>
+            `;
+            return;
+          }
+
+          const obj = snapshot.val();
+          const arr = Object.keys(obj).map(key => ({
+            id: key,
+            ...obj[key]
+          })).sort((a,b) => b.createdAt - a.createdAt);
+
+          commentsTitle.textContent = `Discussion replies (${arr.length})`;
+
+          arr.forEach(comment => {
+            const commentAvatar = comment.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(comment.username || 'A')}`;
+            const wrap = document.createElement("div");
+            wrap.className = "comment-item";
+            wrap.innerHTML = `
+              <span class="avatar-bubble" style="width:34px; height:34px; font-size:14px; flex-shrink:0; overflow:hidden;">
+                <img src="${commentAvatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+              </span>
+              <div class="comment-content-wrap">
+                <div class="comment-meta">
+                  <a href="profile-view.html?id=${comment.uid}" class="commenter-name">u/${comment.username}</a>
+                  <span class="comment-time">${window.App.formatRelativeTime(comment.createdAt)}</span>
+                </div>
+                <p class="comment-body">${escapeHTML(comment.comment)}</p>
+              </div>
+            `;
+            commentsBoxList.appendChild(wrap);
+          });
+        });
+      }
+
+      function renderFullThread(post) {
+        const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+        const savesCount = post.saves ? Object.keys(post.saves).length : 0;
+        const commentsCount = post.comments ? Object.keys(post.comments).length : 0;
+
+        const isLiked = currentUid && post.likes && post.likes[currentUid] === true;
+        const isSaved = currentUid && post.saves && post.saves[currentUid] === true;
+
+        let imageHTML = "";
+        if (post.image) {
+          imageHTML = `
+            <div class="post-image-container" style="max-height: 500px; margin-top:20px;">
+              <img src="${post.image}" class="post-image" alt="Thread visual cover" referrerpolicy="no-referrer">
+            </div>
+          `;
+        }
+
+        const authorAvatar = post.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(post.username || 'U')}`;
+
+        threadContainer.innerHTML = `
+          <div class="glass-card post-card" style="padding: 28px;">
+            <div class="post-header">
+              <div class="post-meta">
+                <span class="avatar-bubble" style="width: 32px; height: 32px; font-size: 14px; overflow:hidden;">
+                  <img src="${authorAvatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+                </span>
+                <a href="community.html?id=${post.communityId}" class="community-badge">c/${post.communityName}</a>
+                <a href="profile-view.html?id=${post.uid}" class="author-name">u/${post.username}</a>
+                <span class="post-time">${window.App.formatRelativeTime(post.createdAt)}</span>
+              </div>
+            </div>
+
+            <h1 style="color:white; font-size: 26px; line-height: 1.4; margin-top: 10px; font-weight:800;">${escapeHTML(post.title)}</h1>
+            <p class="post-content" style="font-size: 15px; margin-top: 14px; line-height:1.6;">${escapeHTML(post.content)}</p>
+
+            ${imageHTML}
+
+            <div class="post-actions" style="margin-top: 24px;">
+              <button class="action-btn like-btn ${isLiked ? 'active' : ''}" id="action-like-uid">
+                <i data-lucide="heart"></i>
+                <span style="font-weight:bold;">${likesCount} Upvotes</span>
+              </button>
+              <a href="comments.html?id=${postId}" class="action-btn">
+                <i data-lucide="message-square"></i>
+                <span style="font-weight:bold;">${commentsCount} Replies</span>
+              </a>
+              <button class="action-btn save-btn ${isSaved ? 'active' : ''}" id="action-save-uid">
+                <i data-lucide="bookmark"></i>
+                <span style="font-weight:bold;">${savesCount} Saves</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        document.getElementById("action-like-uid").addEventListener("click", () => handleActionToggle("likes", isLiked));
+        document.getElementById("action-save-uid").addEventListener("click", () => handleActionToggle("saves", isSaved));
+
+        window.lucide.createIcons();
+      }
+
+      async function handleActionToggle(type, isActive) {
+        if (!currentUid) {
+          window.App.showToast("Signed credentials requested.", "error");
+          return;
+        }
+
+        const refPath = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/${type}/${currentUid}`);
+        try {
+          if (isActive) {
+            await remove(refPath);
+          } else {
+            await set(refPath, true);
+
+            // Fetch author and trigger push notifications
+            const authorSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/uid`));
+            if (authorSnap.exists() && authorSnap.val() !== currentUid) {
+              const uSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/users/${currentUid}/username`));
+              const myUsername = uSnap.exists() ? uSnap.val() : "Someone";
+              const verb = type === "likes" ? "upvoted" : "saved";
+              await window.App.pushNotification(
+                authorSnap.val(),
+                `u/${myUsername} ${verb} your post!`,
+                `post.html?id=${postId}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      function escapeHTML(str) {
+        if (!str) return "";
+        return str.replace(/[&<>'"]/g, 
+          tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+          }[tag] || tag)
+        );
+      }
+    });
+  </script>
 </body>
 </html>

@@ -4,10 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CommunityAMIT - Register</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script type="module" crossorigin src="/assets/register-BI60M_d4.js"></script>
-  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
-  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
 </head>
 <body>
 
@@ -114,5 +121,207 @@
   <div id="footer-placeholder"></div>
 
   <!-- App logic & SDK modules -->
+  <script type="module" src="src/js/app.js"></script>
+  <script type="module">
+    import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+    import { ref, get, set } from "firebase/database";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const registerForm = document.getElementById("register-form-uid");
+      const registerCard = document.getElementById("register-card-uid");
+      const verifyCard = document.getElementById("verify-card-uid");
+      const registerBtn = document.getElementById("register-btn");
+      const targetEmailSpan = document.getElementById("target-email-id");
+      const btnCheckVerified = document.getElementById("btn-check-verified-id");
+      const btnResendVerification = document.getElementById("btn-resend-verification-id");
+
+      let currentRegisteredUser = null;
+
+      const btnUploadAvatar = document.getElementById("btn-upload-avatar-click");
+      const btnRandomAvatar = document.getElementById("btn-random-avatar");
+      const avatarFile = document.getElementById("register-avatar-file");
+      const avatarPreview = document.getElementById("register-avatar-preview");
+      const avatarUrlInput = document.getElementById("register-avatar-url");
+      const avatarSourceLabel = document.getElementById("avatar-source-label");
+
+      // Generate a dynamic initial avatar seed based on a quick random value on load
+      const initSeed = Math.random().toString(36).substring(7);
+      const initPic = `https://api.dicebear.com/7.x/bottts/svg?seed=${initSeed}`;
+      avatarUrlInput.value = initPic;
+      avatarPreview.src = initPic;
+      avatarSourceLabel.textContent = "Default Preset Selected: " + initSeed;
+
+      // Rotate random avatar
+      if (btnRandomAvatar) {
+        btnRandomAvatar.addEventListener("click", () => {
+          const randSeed = Math.random().toString(36).substring(7);
+          const randPic = `https://api.dicebear.com/7.x/bottts/svg?seed=${randSeed}`;
+          avatarUrlInput.value = randPic;
+          avatarPreview.src = randPic;
+          avatarSourceLabel.textContent = "Using Preset Avatar: " + randSeed;
+        });
+      }
+
+      // Upload profile picture trigger
+      if (btnUploadAvatar) {
+        btnUploadAvatar.addEventListener("click", () => {
+          avatarFile.click();
+        });
+      }
+
+      if (avatarFile) {
+        avatarFile.addEventListener("change", async (e) => {
+          if (!e.target.files.length) return;
+          const file = e.target.files[0];
+
+          avatarSourceLabel.textContent = "Uploading image (0%)...";
+          const progressContainer = document.getElementById("register-upload-progress-container");
+          const progressBar = document.getElementById("register-upload-progress-bar");
+          if (progressContainer) progressContainer.style.display = "block";
+          if (progressBar) progressBar.style.width = "0%";
+
+          try {
+            const url = await window.App.uploadImageToCloudinary(file, (percent) => {
+              avatarSourceLabel.textContent = `Uploading image (${percent}%)...`;
+              if (progressBar) progressBar.style.width = `${percent}%`;
+            });
+            avatarUrlInput.value = url;
+            avatarPreview.src = url;
+            avatarSourceLabel.textContent = "Custom Profile Picture Verified ✔";
+            window.App.showToast("Profile image uploaded successfully.", "success");
+          } catch (err) {
+            console.error(err);
+            window.App.showToast("Cloudinary upload failed.", "error");
+            avatarSourceLabel.textContent = "Failed uploading. Please try again.";
+          } finally {
+            if (progressContainer) {
+              setTimeout(() => {
+                progressContainer.style.display = "none";
+              }, 1200);
+            }
+          }
+        });
+      }
+
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fullname = document.getElementById("reg-fullname").value.trim();
+        const username = document.getElementById("reg-username").value.trim().toLowerCase();
+        const email = document.getElementById("reg-email").value.trim();
+        const password = document.getElementById("reg-password").value;
+        const profilePicture = avatarUrlInput.value;
+
+        // Basic clean checks
+        if (!fullname || !username || !email || !password) {
+          window.App.showToast("All fields are mandatory.", "error");
+          return;
+        }
+
+        window.App.setButtonLoading(registerBtn, true);
+
+        try {
+          // 1. Enforce unique username check in database
+          const usernameRef = ref(window.App.db, `${window.App.DB_ROOT}/usernames/${username}`);
+          const usernameSnap = await get(usernameRef);
+
+          if (usernameSnap.exists()) {
+            window.App.showToast("Username is already taken.", "error");
+            window.App.setButtonLoading(registerBtn, false);
+            return;
+          }
+
+          // 2. Create the Auth Profile
+          const userCred = await createUserWithEmailAndPassword(window.App.auth, email, password);
+          const user = userCred.user;
+          currentRegisteredUser = user;
+
+          // 3. Save User Profile Data & map Username
+          const userProfileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${user.uid}`);
+          await set(userProfileRef, {
+            uid: user.uid,
+            fullName: fullname,
+            username: username,
+            email: email,
+            profilePicture: profilePicture,
+            createdAt: Date.now()
+          });
+
+          // Map username globally for lookup during sign-in
+          await set(usernameRef, {
+            uid: user.uid,
+            email: email
+          });
+
+          // 4. Dispatch Email Verification
+          await sendEmailVerification(user);
+          window.App.showToast("Verification dispatch successful.", "success");
+
+          // 5. Hide register screen, display verify panel
+          targetEmailSpan.textContent = email;
+          registerCard.style.display = "none";
+          verifyCard.style.display = "block";
+          window.lucide.createIcons();
+
+        } catch (error) {
+          console.error("Registration error:", error);
+          let errMsg = "Registration failed. Verify your details and try again.";
+          if (error.code === "auth/email-already-in-use") {
+            errMsg = "The provided Email Address is already registered.";
+          }
+          window.App.showToast(errMsg, "error");
+        } finally {
+          window.App.setButtonLoading(registerBtn, false);
+        }
+      });
+
+      // Verification Checking
+      btnCheckVerified.addEventListener("click", async () => {
+        if (!window.App.auth.currentUser) {
+          window.App.showToast("No active registration detected. Please try signing in.", "error");
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+          return;
+        }
+
+        window.App.setButtonLoading(btnCheckVerified, true);
+        try {
+          await window.App.auth.currentUser.reload();
+          if (window.App.auth.currentUser.emailVerified) {
+            window.App.showToast("Verification successful! Redirecting you...", "success");
+            setTimeout(() => {
+              window.location.href = "login.html";
+            }, 1000);
+          } else {
+            window.App.showToast("Email verification still pending.", "error");
+            window.App.setButtonLoading(btnCheckVerified, false);
+          }
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("An error occurred during verification reload checks.", "error");
+          window.App.setButtonLoading(btnCheckVerified, false);
+        }
+      });
+
+      // Resend Verification Email
+      btnResendVerification.addEventListener("click", async () => {
+        if (!window.App.auth.currentUser) {
+          window.App.showToast("Authentication state missing.", "error");
+          return;
+        }
+
+        window.App.setButtonLoading(btnResendVerification, true);
+        try {
+          await sendEmailVerification(window.App.auth.currentUser);
+          window.App.showToast("New verification email dispatched.", "success");
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Resend quota exceeded. Try again in a few minutes.", "error");
+        } finally {
+          window.App.setButtonLoading(btnResendVerification, false);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
