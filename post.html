@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Thread View</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/post-D8cy54km.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <!-- Navigation row -->
+    <div style="display: flex; gap: 8px;">
+      <a href="index.html" class="btn btn-sm">
+        <i data-lucide="arrow-left"></i> Home Stream
+      </a>
+    </div>
+
+    <!-- Main post card workspace -->
+    <div id="thread-full-container" style="width: 100%;">
+      <!-- Loading placeholders -->
+      <div class="glass-card shimmer shimmer-card"></div>
+    </div>
+
+    <!-- Integrated comments system directly for perfect rich post viewing -->
+    <div class="glass-card" style="margin-top: 10px;">
+      <h3 class="comments-section-title" id="comments-title-id">Discussion replies (0)</h3>
+      <div id="comments-box-list-id" class="comments-list" style="margin-top: 15px;">
+        <p style="text-align: center; color: var(--text-muted); font-size: 13px;">Scanning node discussion lines...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+</body>
+</html>

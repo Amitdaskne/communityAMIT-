@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Register</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/register-BI60M_d4.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container auth-box">
+    <!-- Registration Box -->
+    <div class="glass-card" id="register-card-uid">
+      <div class="auth-header">
+        <h1>REGISTER</h1>
+        <p>Aesthetic, verified, glassmorphic community</p>
+      </div>
+
+      <form id="register-form-uid">
+        <div class="form-group">
+          <label class="form-label" for="reg-fullname">Full Name</label>
+          <input type="text" id="reg-fullname" class="input-glass" placeholder="John Doe" required autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-username">Username</label>
+          <input type="text" id="reg-username" class="input-glass" placeholder="johndoe_99" required autocomplete="username" pattern="^[a-zA-Z0-9_\-]+$" title="Letters, numbers, underscores and hyphens only">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-email">Email Address</label>
+          <input type="email" id="reg-email" class="input-glass" placeholder="john@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-password">Password</label>
+          <input type="password" id="reg-password" class="input-glass" placeholder="••••••••" required autocomplete="new-password" minlength="6">
+        </div>
+
+        <!-- Mandatory Profile Picture block -->
+        <div class="form-group" style="margin-top: 15px;">
+          <label class="form-label">Profile Picture (Required)</label>
+          
+          <!-- Selected Preview -->
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="avatar-bubble" id="register-avatar-preview-container" style="width: 60px; height: 60px; overflow: hidden; flex-shrink: 0; position: relative; border: 2px solid var(--accent-color);">
+              <img id="register-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=avatar_1" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+            </div>
+            <div style="flex-grow: 1;">
+              <p style="font-size: 13px; color: white; font-weight: 500;">Custom or Preset Avatar</p>
+              <span id="avatar-source-label" style="font-size: 11px; color: var(--text-secondary); display: block;">Using Preset Avatar</span>
+              <!-- Upload progress bar container -->
+              <div id="register-upload-progress-container" style="display: none; width: 100%; background: rgba(255,255,255,0.08); height: 5px; border-radius: 4px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div id="register-upload-progress-bar" style="width: 0%; height: 100%; background: #ffffff; transition: width 0.1s ease-out;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons: Upload or Generate -->
+          <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <button type="button" class="btn btn-sm" id="btn-upload-avatar-click" style="flex: 1; height: 38px;">
+              <i data-lucide="upload" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Upload Photo
+            </button>
+            <button type="button" class="btn btn-sm" id="btn-random-avatar" style="flex: 1; height: 38px; background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15);">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Rotate Preset
+            </button>
+          </div>
+          
+          <input type="file" id="register-avatar-file" accept="image/*" style="display: none;">
+          <input type="hidden" id="register-avatar-url" value="https://api.dicebear.com/7.x/bottts/svg?seed=avatar_1">
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full" id="register-btn" style="margin-top: 15px;">
+          <i data-lucide="user-plus"></i> Create Account
+        </button>
+      </form>
+
+      <div class="auth-links">
+        <p>Already Registered? <a href="login.html">Sign In Here</a></p>
+      </div>
+    </div>
+
+    <!-- Verification Required Screen (Hidden Initially) -->
+    <div class="glass-card verify-screen" id="verify-card-uid" style="display: none;">
+      <div class="verify-icon">
+        <i data-lucide="shield-alert" style="width: 54px; height: 54px;"></i>
+      </div>
+      <h2>Verification Required</h2>
+      <p class="verify-email-text" style="margin-top: 15px; margin-bottom: 20px;">
+        A verification email was sent to:<br>
+        <span id="target-email-id" style="color: var(--accent-color); font-weight: bold;"></span>
+      </p>
+      <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 24px;">
+        Please check your spam/junk folder. Once verified, click below to log in.
+      </p>
+
+      <div class="form-group" style="gap: 12px;">
+        <button class="btn btn-primary w-full" id="btn-check-verified-id">
+          <i data-lucide="check-circle-2"></i> I Have Verified My Email
+        </button>
+        <button class="btn w-full" id="btn-resend-verification-id" style="margin-top: 10px;">
+          <i data-lucide="mail"></i> Resend Verification Email
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+</body>
+</html>

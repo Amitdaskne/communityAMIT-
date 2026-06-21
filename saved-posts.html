@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Saved bookmarks</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/savedPosts-HKWozL48.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <!-- Navigation row -->
+    <div>
+      <a href="profile.html" class="btn btn-sm">
+        <i data-lucide="arrow-left"></i> Profile
+      </a>
+    </div>
+
+    <!-- Title Header -->
+    <div style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px;">
+      <h3 style="font-size: 16px; color: white; letter-spacing: 1px;">Saved Bookmarks</h3>
+    </div>
+
+    <!-- Saved Posts Stream list -->
+    <div id="saved-stream-container" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+      <div class="glass-card shimmer shimmer-card"></div>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+</body>
+</html>

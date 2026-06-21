@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Profile</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/profile-B3OKF4fk.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <div class="glass-card" id="profile-card-uid" style="display: flex; flex-direction: column; align-items: center;">
+      
+      <!-- Profiler Header -->
+      <div class="profile-info-header" id="profile-header-loader">
+        <div class="avatar-bubble lg" id="user-avatar-char" style="overflow: hidden;">U</div>
+        <h2 class="profile-name" id="user-display-name">Loading...</h2>
+        <p class="profile-username" id="user-display-username">u/loading</p>
+        <p class="profile-email" id="user-display-email"><i data-lucide="mail" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ...</p>
+        <p class="profile-uid" style="opacity:0.6; font-size:10px;" id="user-display-uid">UID: ...</p>
+        
+        <div style="margin-top: 10px; display: flex; gap: 8px;" id="user-display-status">
+          <span style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.25); color: var(--success); padding: 4px 10px; border-radius: 20px; font-size: 11px;">
+            <i data-lucide="shield-check" style="width:11px; height:11px; display:inline-block; vertical-align:middle;"></i> Verified Citizen
+          </span>
+        </div>
+      </div>
+
+      <!-- Live Statistics Grid -->
+      <div class="stats-grid w-full">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-posts-count">0</div>
+          <div class="stat-label">My Posts</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-saved-count">0</div>
+          <div class="stat-label">Saved</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-liked-count">0</div>
+          <div class="stat-label">Liked</div>
+        </div>
+      </div>
+
+      <!-- Interaction Panel Links -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 14px;">
+        <a href="my-posts.html" class="btn w-full">
+          <i data-lucide="edit-3"></i> My Posts & Contributions
+        </a>
+        <a href="saved-posts.html" class="btn w-full">
+          <i data-lucide="bookmark"></i> Saved Bookmarks
+        </a>
+        <a href="edit-profile.html" class="btn w-full">
+          <i data-lucide="settings"></i> Edit Profile Name
+        </a>
+        <button class="btn btn-danger w-full" id="btn-profile-logout">
+          <i data-lucide="log-out"></i> Log Out Profile
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+</body>
+</html>

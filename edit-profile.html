@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Edit Profile</title>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js"
+      }
+    }
+  </script>
+  <script type="module" crossorigin src="/assets/editProfile-BHN8ks7r.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <div class="glass-card">
+      <div class="auth-header" style="text-align: left;">
+        <h2 style="font-size: 24px; color: white; letter-spacing: 1px;"><i data-lucide="user-cog" style="display:inline-block; vertical-align:middle; margin-right:8px; color:var(--accent-color);"></i> EDIT PROFILE</h2>
+        <p>Update your credentials shown inside CommunityAMIT</p>
+      </div>
+
+      <form id="edit-profile-form-uid" style="margin-top: 20px;">
+        <!-- Profile Picture block -->
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">Profile Picture (Required)</label>
+          
+          <!-- Selected Preview -->
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="avatar-bubble" id="edit-avatar-preview-container" style="width: 60px; height: 60px; overflow: hidden; flex-shrink: 0; position: relative; border: 2px solid var(--accent-color);">
+              <img id="edit-avatar-preview" src="" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+            </div>
+            <div style="flex-grow: 1;">
+              <p style="font-size: 13px; color: white; font-weight: 500;">Edit Profile Photo</p>
+              <span id="edit-avatar-source-label" style="font-size: 11px; color: var(--text-secondary); display: block;">Loading current image...</span>
+              <!-- Upload progress bar container -->
+              <div id="edit-upload-progress-container" style="display: none; width: 100%; background: rgba(255,255,255,0.08); height: 5px; border-radius: 4px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div id="edit-upload-progress-bar" style="width: 0%; height: 100%; background: #ffffff; transition: width 0.1s ease-out;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons: Upload or Generate -->
+          <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <button type="button" class="btn btn-sm" id="btn-edit-upload-avatar" style="flex: 1; height: 38px;">
+              <i data-lucide="upload" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Upload Photo
+            </button>
+            <button type="button" class="btn btn-sm" id="btn-edit-random-avatar" style="flex: 1; height: 38px; background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15);">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Rotate Preset
+            </button>
+          </div>
+          
+          <input type="file" id="edit-avatar-file" accept="image/*" style="display: none;">
+          <input type="hidden" id="edit-avatar-url" value="">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="edit-fullname">Full Name</label>
+          <input type="text" id="edit-fullname" class="input-glass" placeholder="Your Full Name" required autocomplete="name">
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <a href="profile.html" class="btn w-full text-center" style="flex:1;">
+            Cancel
+          </a>
+          <button type="submit" class="btn btn-primary w-full" id="btn-save-profile" style="flex:1;">
+            <i data-lucide="save"></i> Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+</body>
+</html>
