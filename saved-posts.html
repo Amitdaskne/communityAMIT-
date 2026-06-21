@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CommunityAMIT - Saved bookmarks</title>
-  <link rel="stylesheet" href="/style.css">
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module" crossorigin src="/assets/savedPosts-HKWozL48.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/app-DSFfU5DC.js">
+  <link rel="stylesheet" crossorigin href="/assets/app-CtXFagLD.css">
 </head>
 <body>
 
@@ -36,133 +38,5 @@
   <div id="nav-placeholder"></div>
 
   <!-- App logic & SDK modules -->
-  <script type="module" src="/src/js/app.js"></script>
-  <script type="module">
-    import { ref, onValue, remove } from "firebase/database";
-    import { onAuthStateChanged } from "firebase/auth";
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const container = document.getElementById("saved-stream-container");
-      let currentUid = null;
-
-      onAuthStateChanged(window.App.auth, (user) => {
-        if (!user) return;
-        currentUid = user.uid;
-        initSavedListener();
-      });
-
-      function initSavedListener() {
-        const postsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts`);
-        
-        onValue(postsRef, (snapshot) => {
-          container.innerHTML = "";
-          
-          if (!snapshot.exists()) {
-            renderEmptySaved();
-            return;
-          }
-
-          const obj = snapshot.val();
-          const list = Object.keys(obj)
-            .map(key => ({ id: key, ...obj[key] }))
-            .filter(post => post.saves && post.saves[currentUid] === true)
-            .sort((a,b) => b.createdAt - a.createdAt);
-
-          if (list.length === 0) {
-            renderEmptySaved();
-            return;
-          }
-
-          list.forEach(post => {
-            const likesCount = post.likes ? Object.keys(post.likes).length : 0;
-            const commentsCount = post.comments ? Object.keys(post.comments).length : 0;
-
-            const card = document.createElement("div");
-            card.className = "glass-card post-card";
-
-            let mediaHTML = "";
-            if (post.image) {
-              mediaHTML = `
-                <div class="post-image-container" style="max-height:160px;">
-                  <img src="${post.image}" class="post-image" alt="Visual asset" referrerpolicy="no-referrer">
-                </div>
-              `;
-            }
-
-            card.innerHTML = `
-              <div class="post-header">
-                <div class="post-meta">
-                  <span class="community-badge">c/${post.communityName}</span>
-                  <a href="profile-view.html?id=${post.uid}" class="author-name">u/${post.username}</a>
-                  <span class="post-time">${window.App.formatRelativeTime(post.createdAt)}</span>
-                </div>
-              </div>
-
-              <a href="post.html?id=${post.id}" class="post-title">${escapeHTML(post.title)}</a>
-              <p class="post-content" style="max-height:90px; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(post.content)}</p>
-              ${mediaHTML}
-
-              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.05); padding-top:12px; margin-top:8px;">
-                <div style="display:flex; gap:10px; font-size:12px; color:var(--text-secondary);">
-                  <span><i data-lucide="heart" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> ${likesCount} to upvotes</span>
-                  <span><i data-lucide="message-square" style="width:12px; height:12px; display:inline-block; vertical-align:middle;"></i> ${commentsCount} replies</span>
-                </div>
-
-                <button class="btn btn-sm btn-danger remove-bookmarks-btn" data-id="${post.id}">
-                  <i data-lucide="bookmark-minus"></i> Remove Bookmark
-                </button>
-              </div>
-            `;
-
-            container.appendChild(card);
-
-            card.querySelector(".remove-bookmarks-btn").addEventListener("click", (e) => {
-              handleRemoveSaved(e.currentTarget.dataset.id);
-            });
-          });
-
-          window.lucide.createIcons();
-        });
-      }
-
-      function renderEmptySaved() {
-        container.innerHTML = `
-          <div class="glass-card empty-state">
-            <i data-lucide="bookmark"></i>
-            <h3>No Saved Bookmarks</h3>
-            <p>You haven't bookmarked any transmissions to your local records yet.</p>
-            <a href="index.html" class="btn btn-primary mt-12 btn-sm">
-              <i data-lucide="compass"></i> Explore Home Feed
-            </a>
-          </div>
-        `;
-        window.lucide.createIcons();
-      }
-
-      async function handleRemoveSaved(postId) {
-        const savesRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/saves/${currentUid}`);
-        try {
-          await remove(savesRef);
-          window.App.showToast("Bookmark dismissed.", "success");
-        } catch (e) {
-          console.error(e);
-          window.App.showToast("Error dismissing bookmark.", "error");
-        }
-      }
-
-      function escapeHTML(str) {
-        if (!str) return "";
-        return str.replace(/[&<>'"]/g, 
-          tag => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            "'": '&#39;',
-            '"': '&quot;'
-          }[tag] || tag)
-        );
-      }
-    });
-  </script>
 </body>
 </html>

@@ -1,6 +1,0 @@
-{
-  "name": "CommunityAMIT",
-  "description": "A premium modern, glassmorphic Reddit-style community and forum web application powered by Firebase Authentication, Realtime Database, and Cloudinary.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
