@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Broadcast</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <div class="glass-card">
+      <div class="auth-header" style="text-align: left; margin-bottom: 20px;">
+        <h2 style="font-size: 24px; color: white;"><i data-lucide="plus-square" style="display:inline-block; vertical-align:middle; margin-right:8px; color:var(--accent-color);"></i> BROADCAST NEW POST</h2>
+        <p>Post to any community, attach premium image cards</p>
+      </div>
+
+      <form id="create-post-form-uid">
+        
+        <div class="form-group">
+          <label class="form-label" for="post-community">Community Name</label>
+          <input type="text" id="post-community" class="input-glass" placeholder="e.g. ReactJS, space, tech" required>
+          <span style="font-size:11px; color:var(--text-muted);">This will map to c/community_name</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="post-title">Post Title</label>
+          <input type="text" id="post-title" class="input-glass" placeholder="Express your absolute thoughts..." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="post-content">Content Body</label>
+          <textarea id="post-content" class="input-glass" rows="6" placeholder="Write markdown or standard text details here..." required style="resize: vertical; font-family:inherit;"></textarea>
+        </div>
+
+        <!-- Image Upload Dropzone -->
+        <div class="form-group">
+          <label class="form-label">Attach Media Asset (Cloudinary)</label>
+          <div class="image-selector-container" id="upload-zone-id">
+            <input type="file" id="post-image-file" accept="image/*" style="display: none;">
+            
+            <div id="upload-zone-prompt">
+              <i data-lucide="image" class="upload-icon"></i>
+              <p style="font-weight: 500; color: white; font-size:14px;">Drag and drop image here or click</p>
+              <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">PNG, JPG, GIF up to 10MB</p>
+            </div>
+
+            <!-- Previews -->
+            <img src="#" id="upload-preview-id" class="upload-preview" alt="Upload Preview">
+            <button type="button" class="remove-upload-btn" id="btn-remove-preview-id">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full" id="btn-submit-post" style="margin-top: 10px;">
+          <i data-lucide="send"></i> Post to Feed
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, get, set, push } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const createForm = document.getElementById("create-post-form-uid");
+      const uploadZone = document.getElementById("upload-zone-id");
+      const imageFile = document.getElementById("post-image-file");
+      const previewImg = document.getElementById("upload-preview-id");
+      const uploadPrompt = document.getElementById("upload-zone-prompt");
+      const removePreviewBtn = document.getElementById("btn-remove-preview-id");
+      const submitBtn = document.getElementById("btn-submit-post");
+
+      let currentUid = null;
+      let userData = null;
+      let uploadedImageURL = "";
+
+      // Track active verification
+      onAuthStateChanged(window.App.auth, async (user) => {
+        if (!user) return;
+        currentUid = user.uid;
+
+        // Fetch display names and cached credentials
+        const profileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${user.uid}`);
+        try {
+          const snapshot = await get(profileRef);
+          if (snapshot.exists()) {
+            userData = snapshot.val();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        window.lucide.createIcons();
+      });
+
+      // Drag and drop zone interactions
+      uploadZone.addEventListener("click", () => imageFile.click());
+
+      uploadZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadZone.classList.add("dragover");
+      });
+
+      uploadZone.addEventListener("dragleave", () => {
+        uploadZone.classList.remove("dragover");
+      });
+
+      uploadZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove("dragover");
+        if (e.dataTransfer.files.length) {
+          handleFileSelection(e.dataTransfer.files[0]);
+        }
+      });
+
+      imageFile.addEventListener("change", (e) => {
+        if (e.target.files.length) {
+          handleFileSelection(e.target.files[0]);
+        }
+      });
+
+      // Cancel button interactions
+      removePreviewBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // Avoid triggering file chooser dialog
+        imageFile.value = "";
+        uploadedImageURL = "";
+        previewImg.style.display = "none";
+        removePreviewBtn.style.display = "none";
+        uploadPrompt.style.display = "block";
+      });
+
+      // Async Cloudinary Upload helper
+      async function handleFileSelection(file) {
+        if (!file) return;
+
+        // Visual progress indicator
+        uploadPrompt.innerHTML = `
+          <div id="post-upload-progress-container" style="width:100%; padding:0 30px; box-sizing: border-box;">
+            <p style="color:white; font-size:14px; margin-bottom:12px; font-weight:500;" id="post-upload-text">Uploading Media (0%)...</p>
+            <div style="width: 100%; background: rgba(255,255,255,0.08); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.06); box-sizing: border-box;">
+              <div id="post-upload-progress-bar" style="width: 0%; height: 100%; background: #ffffff; transition: width 0.15s ease-out;"></div>
+            </div>
+          </div>
+        `;
+
+        try {
+          const url = await window.App.uploadImageToCloudinary(file, (percent) => {
+            const uploadText = document.getElementById("post-upload-text");
+            const progressBar = document.getElementById("post-upload-progress-bar");
+            if (uploadText) uploadText.textContent = `Uploading Media (${percent}%)...`;
+            if (progressBar) progressBar.style.width = `${percent}%`;
+          });
+          uploadedImageURL = url;
+
+          // Transition to thumbnail mode
+          previewImg.src = url;
+          previewImg.style.display = "block";
+          removePreviewBtn.style.display = "flex";
+          uploadPrompt.style.display = "none";
+          window.App.showToast("Media uploaded successfully.", "success");
+        } catch (err) {
+          console.error(err);
+          window.App.showToast("Cloudinary upload failed.", "error");
+          
+          // Revert visual prompts
+          uploadPrompt.innerHTML = `
+            <i data-lucide="image" class="upload-icon"></i>
+            <p style="font-weight: 500; color: white;">Drag and drop image here or click</p>
+            <p style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">PNG, JPG, GIF up to 10MB</p>
+          `;
+          window.lucide.createIcons();
+        }
+      }
+
+      // Submission Pipeline
+      createForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        if (!currentUid || !userData) {
+          window.App.showToast("Session credentials missing. Please re-sign.", "error");
+          return;
+        }
+
+        const rawCommunity = document.getElementById("post-community").value.trim();
+        const title = document.getElementById("post-title").value.trim();
+        const content = document.getElementById("post-content").value.trim();
+
+        if (!rawCommunity || !title || !content) {
+          window.App.showToast("All input forms are required.", "error");
+          return;
+        }
+
+        // Slugify community Id helper (lowercase, remove spaces)
+        const communityId = rawCommunity.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const communityName = rawCommunity;
+
+        if (!communityId) {
+          window.App.showToast("Invalid community name.", "error");
+          return;
+        }
+
+        window.App.setButtonLoading(submitBtn, true);
+
+        try {
+          // 1. Ensure community existence
+          const communityRef = ref(window.App.db, `${window.App.DB_ROOT}/communities/${communityId}`);
+          const commSnap = await get(communityRef);
+
+          if (!commSnap.exists()) {
+            await set(communityRef, {
+              id: communityId,
+              name: communityName,
+              description: `A decentralized premium glass sanctuary discussing c/${communityName}`,
+              memberCount: 1,
+              creatorUid: currentUid,
+              createdAt: Date.now()
+            });
+            // Automatically join community creator
+            await set(ref(window.App.db, `${window.App.DB_ROOT}/communities/${communityId}/members/${currentUid}`), true);
+          }
+
+          // 2. Push post item
+          const postsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts`);
+          const newPostRef = push(postsRef);
+
+          await set(newPostRef, {
+            id: newPostRef.key,
+            uid: currentUid,
+            username: userData.username,
+            fullName: userData.fullName,
+            profilePicture: userData.profilePicture || "",
+            communityId: communityId,
+            communityName: communityName,
+            title: title,
+            content: content,
+            image: uploadedImageURL,
+            createdAt: Date.now()
+          });
+
+          window.App.showToast("Broadcast transmitted successfully!", "success");
+          setTimeout(() => {
+            window.location.href = "index.html";
+          }, 1000);
+
+        } catch (error) {
+          console.error("Save post error:", error);
+          window.App.showToast("Transmission bottlenecked. Error saving.", "error");
+          window.App.setButtonLoading(submitBtn, false);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

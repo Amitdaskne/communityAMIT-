@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Register</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container auth-box">
+    <!-- Registration Box -->
+    <div class="glass-card" id="register-card-uid">
+      <div class="auth-header">
+        <h1>REGISTER</h1>
+        <p>Aesthetic, verified, glassmorphic community</p>
+      </div>
+
+      <form id="register-form-uid">
+        <div class="form-group">
+          <label class="form-label" for="reg-fullname">Full Name</label>
+          <input type="text" id="reg-fullname" class="input-glass" placeholder="John Doe" required autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-username">Username</label>
+          <input type="text" id="reg-username" class="input-glass" placeholder="johndoe_99" required autocomplete="username" pattern="^[a-zA-Z0-9_\-]+$" title="Letters, numbers, underscores and hyphens only">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-email">Email Address</label>
+          <input type="email" id="reg-email" class="input-glass" placeholder="john@example.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-password">Password</label>
+          <input type="password" id="reg-password" class="input-glass" placeholder="••••••••" required autocomplete="new-password" minlength="6">
+        </div>
+
+        <!-- Mandatory Profile Picture block -->
+        <div class="form-group" style="margin-top: 15px;">
+          <label class="form-label">Profile Picture (Required)</label>
+          
+          <!-- Selected Preview -->
+          <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 12px; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.08);">
+            <div class="avatar-bubble" id="register-avatar-preview-container" style="width: 60px; height: 60px; overflow: hidden; flex-shrink: 0; position: relative; border: 2px solid var(--accent-color);">
+              <img id="register-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=avatar_1" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+            </div>
+            <div style="flex-grow: 1;">
+              <p style="font-size: 13px; color: white; font-weight: 500;">Custom or Preset Avatar</p>
+              <span id="avatar-source-label" style="font-size: 11px; color: var(--text-secondary); display: block;">Using Preset Avatar</span>
+              <!-- Upload progress bar container -->
+              <div id="register-upload-progress-container" style="display: none; width: 100%; background: rgba(255,255,255,0.08); height: 5px; border-radius: 4px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <div id="register-upload-progress-bar" style="width: 0%; height: 100%; background: #ffffff; transition: width 0.1s ease-out;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons: Upload or Generate -->
+          <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <button type="button" class="btn btn-sm" id="btn-upload-avatar-click" style="flex: 1; height: 38px;">
+              <i data-lucide="upload" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Upload Photo
+            </button>
+            <button type="button" class="btn btn-sm" id="btn-random-avatar" style="flex: 1; height: 38px; background: rgba(255, 255, 255, 0.08); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15);">
+              <i data-lucide="refresh-cw" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Rotate Preset
+            </button>
+          </div>
+          
+          <input type="file" id="register-avatar-file" accept="image/*" style="display: none;">
+          <input type="hidden" id="register-avatar-url" value="https://api.dicebear.com/7.x/bottts/svg?seed=avatar_1">
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full" id="register-btn" style="margin-top: 15px;">
+          <i data-lucide="user-plus"></i> Create Account
+        </button>
+      </form>
+
+      <div class="auth-links">
+        <p>Already Registered? <a href="login.html">Sign In Here</a></p>
+      </div>
+    </div>
+
+    <!-- Verification Required Screen (Hidden Initially) -->
+    <div class="glass-card verify-screen" id="verify-card-uid" style="display: none;">
+      <div class="verify-icon">
+        <i data-lucide="shield-alert" style="width: 54px; height: 54px;"></i>
+      </div>
+      <h2>Verification Required</h2>
+      <p class="verify-email-text" style="margin-top: 15px; margin-bottom: 20px;">
+        A verification email was sent to:<br>
+        <span id="target-email-id" style="color: var(--accent-color); font-weight: bold;"></span>
+      </p>
+      <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 24px;">
+        Please check your spam/junk folder. Once verified, click below to log in.
+      </p>
+
+      <div class="form-group" style="gap: 12px;">
+        <button class="btn btn-primary w-full" id="btn-check-verified-id">
+          <i data-lucide="check-circle-2"></i> I Have Verified My Email
+        </button>
+        <button class="btn w-full" id="btn-resend-verification-id" style="margin-top: 10px;">
+          <i data-lucide="mail"></i> Resend Verification Email
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from "firebase/auth";
+    import { ref, get, set } from "firebase/database";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const registerForm = document.getElementById("register-form-uid");
+      const registerCard = document.getElementById("register-card-uid");
+      const verifyCard = document.getElementById("verify-card-uid");
+      const registerBtn = document.getElementById("register-btn");
+      const targetEmailSpan = document.getElementById("target-email-id");
+      const btnCheckVerified = document.getElementById("btn-check-verified-id");
+      const btnResendVerification = document.getElementById("btn-resend-verification-id");
+
+      let currentRegisteredUser = null;
+
+      const btnUploadAvatar = document.getElementById("btn-upload-avatar-click");
+      const btnRandomAvatar = document.getElementById("btn-random-avatar");
+      const avatarFile = document.getElementById("register-avatar-file");
+      const avatarPreview = document.getElementById("register-avatar-preview");
+      const avatarUrlInput = document.getElementById("register-avatar-url");
+      const avatarSourceLabel = document.getElementById("avatar-source-label");
+
+      // Generate a dynamic initial avatar seed based on a quick random value on load
+      const initSeed = Math.random().toString(36).substring(7);
+      const initPic = `https://api.dicebear.com/7.x/bottts/svg?seed=${initSeed}`;
+      avatarUrlInput.value = initPic;
+      avatarPreview.src = initPic;
+      avatarSourceLabel.textContent = "Default Preset Selected: " + initSeed;
+
+      // Rotate random avatar
+      if (btnRandomAvatar) {
+        btnRandomAvatar.addEventListener("click", () => {
+          const randSeed = Math.random().toString(36).substring(7);
+          const randPic = `https://api.dicebear.com/7.x/bottts/svg?seed=${randSeed}`;
+          avatarUrlInput.value = randPic;
+          avatarPreview.src = randPic;
+          avatarSourceLabel.textContent = "Using Preset Avatar: " + randSeed;
+        });
+      }
+
+      // Upload profile picture trigger
+      if (btnUploadAvatar) {
+        btnUploadAvatar.addEventListener("click", () => {
+          avatarFile.click();
+        });
+      }
+
+      if (avatarFile) {
+        avatarFile.addEventListener("change", async (e) => {
+          if (!e.target.files.length) return;
+          const file = e.target.files[0];
+
+          avatarSourceLabel.textContent = "Uploading image (0%)...";
+          const progressContainer = document.getElementById("register-upload-progress-container");
+          const progressBar = document.getElementById("register-upload-progress-bar");
+          if (progressContainer) progressContainer.style.display = "block";
+          if (progressBar) progressBar.style.width = "0%";
+
+          try {
+            const url = await window.App.uploadImageToCloudinary(file, (percent) => {
+              avatarSourceLabel.textContent = `Uploading image (${percent}%)...`;
+              if (progressBar) progressBar.style.width = `${percent}%`;
+            });
+            avatarUrlInput.value = url;
+            avatarPreview.src = url;
+            avatarSourceLabel.textContent = "Custom Profile Picture Verified ✔";
+            window.App.showToast("Profile image uploaded successfully.", "success");
+          } catch (err) {
+            console.error(err);
+            window.App.showToast("Cloudinary upload failed.", "error");
+            avatarSourceLabel.textContent = "Failed uploading. Please try again.";
+          } finally {
+            if (progressContainer) {
+              setTimeout(() => {
+                progressContainer.style.display = "none";
+              }, 1200);
+            }
+          }
+        });
+      }
+
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fullname = document.getElementById("reg-fullname").value.trim();
+        const username = document.getElementById("reg-username").value.trim().toLowerCase();
+        const email = document.getElementById("reg-email").value.trim();
+        const password = document.getElementById("reg-password").value;
+        const profilePicture = avatarUrlInput.value;
+
+        // Basic clean checks
+        if (!fullname || !username || !email || !password) {
+          window.App.showToast("All fields are mandatory.", "error");
+          return;
+        }
+
+        window.App.setButtonLoading(registerBtn, true);
+
+        try {
+          // 1. Enforce unique username check in database
+          const usernameRef = ref(window.App.db, `${window.App.DB_ROOT}/usernames/${username}`);
+          const usernameSnap = await get(usernameRef);
+
+          if (usernameSnap.exists()) {
+            window.App.showToast("Username is already taken.", "error");
+            window.App.setButtonLoading(registerBtn, false);
+            return;
+          }
+
+          // 2. Create the Auth Profile
+          const userCred = await createUserWithEmailAndPassword(window.App.auth, email, password);
+          const user = userCred.user;
+          currentRegisteredUser = user;
+
+          // 3. Save User Profile Data & map Username
+          const userProfileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${user.uid}`);
+          await set(userProfileRef, {
+            uid: user.uid,
+            fullName: fullname,
+            username: username,
+            email: email,
+            profilePicture: profilePicture,
+            createdAt: Date.now()
+          });
+
+          // Map username globally for lookup during sign-in
+          await set(usernameRef, {
+            uid: user.uid,
+            email: email
+          });
+
+          // 4. Dispatch Email Verification
+          await sendEmailVerification(user);
+          window.App.showToast("Verification dispatch successful.", "success");
+
+          // 5. Hide register screen, display verify panel
+          targetEmailSpan.textContent = email;
+          registerCard.style.display = "none";
+          verifyCard.style.display = "block";
+          window.lucide.createIcons();
+
+        } catch (error) {
+          console.error("Registration error:", error);
+          let errMsg = "Registration failed. Verify your details and try again.";
+          if (error.code === "auth/email-already-in-use") {
+            errMsg = "The provided Email Address is already registered.";
+          }
+          window.App.showToast(errMsg, "error");
+        } finally {
+          window.App.setButtonLoading(registerBtn, false);
+        }
+      });
+
+      // Verification Checking
+      btnCheckVerified.addEventListener("click", async () => {
+        if (!window.App.auth.currentUser) {
+          window.App.showToast("No active registration detected. Please try signing in.", "error");
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+          return;
+        }
+
+        window.App.setButtonLoading(btnCheckVerified, true);
+        try {
+          await window.App.auth.currentUser.reload();
+          if (window.App.auth.currentUser.emailVerified) {
+            window.App.showToast("Verification successful! Redirecting you...", "success");
+            setTimeout(() => {
+              window.location.href = "login.html";
+            }, 1000);
+          } else {
+            window.App.showToast("Email verification still pending.", "error");
+            window.App.setButtonLoading(btnCheckVerified, false);
+          }
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("An error occurred during verification reload checks.", "error");
+          window.App.setButtonLoading(btnCheckVerified, false);
+        }
+      });
+
+      // Resend Verification Email
+      btnResendVerification.addEventListener("click", async () => {
+        if (!window.App.auth.currentUser) {
+          window.App.showToast("Authentication state missing.", "error");
+          return;
+        }
+
+        window.App.setButtonLoading(btnResendVerification, true);
+        try {
+          await sendEmailVerification(window.App.auth.currentUser);
+          window.App.showToast("New verification email dispatched.", "success");
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Resend quota exceeded. Try again in a few minutes.", "error");
+        } finally {
+          window.App.setButtonLoading(btnResendVerification, false);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

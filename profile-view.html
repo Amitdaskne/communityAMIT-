@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Member View</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <!-- Navigation row -->
+    <div>
+      <a href="index.html" class="btn btn-sm">
+        <i data-lucide="arrow-left"></i> Home Feed
+      </a>
+    </div>
+
+    <!-- Target User Information Glass Card -->
+    <div class="glass-card" style="display: flex; flex-direction: column; align-items: center;" id="profile-container-id">
+      <div class="profile-info-header" style="margin-bottom: 20px;">
+        <div class="avatar-bubble lg" id="view-avatar-char" style="overflow: hidden;">?</div>
+        <h2 class="profile-name" id="view-display-name">Loading Profile...</h2>
+        <p class="profile-username" id="view-display-username">u/loading</p>
+        <p class="profile-email" id="view-display-email">Joined ...</p>
+        <button class="btn btn-primary" id="btn-message-user-uid" style="display: none; margin-top: 15px; width: 100%; justify-content: center; align-items: center; gap: 8px;">
+          <i data-lucide="message-square" style="width: 16px; height: 16px;"></i> Send Message
+        </button>
+      </div>
+
+      <!-- User Stats Grid -->
+      <div class="stats-grid w-full">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-posts-count-view">0</div>
+          <div class="stat-label">Contributions</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-saves-count-view">0</div>
+          <div class="stat-label">Liked posts</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-bookmarks-count-view">0</div>
+          <div class="stat-label">Saved posts</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User contributions banner -->
+    <div style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-top: 10px;">
+      <h3 style="font-size: 16px; color: white; letter-spacing: 1px;" id="view-posts-text">u/ contributions</h3>
+    </div>
+
+    <!-- Filtered user post collection -->
+    <div id="view-user-posts-list-id" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+      <div class="glass-card shimmer shimmer-card"></div>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, get, onValue, set, remove } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetUid = urlParams.get("id");
+
+      if (!targetUid) {
+        window.App.showToast("No target user identifier loaded.", "error");
+        setTimeout(() => { window.location.href = "index.html"; }, 1200);
+        return;
+      }
+
+      const viewAvatarChar = document.getElementById("view-avatar-char");
+      const viewDisplayName = document.getElementById("view-display-name");
+      const viewDisplayUsername = document.getElementById("view-display-username");
+      const viewDisplayEmail = document.getElementById("view-display-email");
+
+      const statPostsCount = document.getElementById("stat-posts-count-view");
+      const statSavesCount = document.getElementById("stat-saves-count-view");
+      const statBookmarksCount = document.getElementById("stat-bookmarks-count-view");
+
+      const postsLabel = document.getElementById("view-posts-text");
+      const userPostList = document.getElementById("view-user-posts-list-id");
+
+      let currentUid = null;
+
+      onAuthStateChanged(window.App.auth, (user) => {
+        if (user) {
+          currentUid = user.uid;
+        }
+        initViewTargetProfile();
+      });
+
+      async function initViewTargetProfile() {
+        // 1. Fetch user detail metrics once
+        const profileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${targetUid}`);
+        try {
+          const snapshot = await get(profileRef);
+          if (!snapshot.exists()) {
+            viewDisplayName.textContent = "Unknown Matrix Citizen";
+            viewDisplayUsername.textContent = "u/unknown";
+            viewAvatarChar.textContent = "?";
+            viewDisplayEmail.textContent = "Nodes de-referenced.";
+            userPostList.innerHTML = "";
+            return;
+          }
+
+          const profile = snapshot.val();
+          viewDisplayName.textContent = profile.fullName;
+          viewDisplayUsername.textContent = `u/${profile.username}`;
+          
+          const picUrl = profile.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(profile.username || 'M')}`;
+          viewAvatarChar.innerHTML = `<img src="${picUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">`;
+          
+          if (profile.createdAt) {
+            const date = new Date(profile.createdAt);
+            viewDisplayEmail.textContent = `Registered Member: ${date.toLocaleDateString()}`;
+          } else {
+            viewDisplayEmail.textContent = `Registered Member`;
+          }
+
+          // Show Message button if viewing another user's profile
+          const msgBtn = document.getElementById("btn-message-user-uid");
+          if (msgBtn) {
+            if (currentUid && currentUid !== targetUid) {
+              msgBtn.style.display = "flex";
+              msgBtn.addEventListener("click", () => {
+                window.location.href = `chat.html?target=${encodeURIComponent(targetUid)}`;
+              });
+              if (window.lucide) {
+                window.lucide.createIcons();
+              }
+            } else {
+              msgBtn.style.display = "none";
+            }
+          }
+
+          postsLabel.textContent = `u/${profile.username} Contributions`;
+
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Bottleneck loading citizen details.", "error");
+        }
+
+        // 2. Realtime listener counting target stats and filtering posts
+        const postsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts`);
+        onValue(postsRef, (snapshot) => {
+          userPostList.innerHTML = "";
+          
+          let targetPostsCount = 0;
+          let targetLikedCount = 0;
+          let targetSavedCount = 0;
+
+          if (!snapshot.exists()) {
+            renderEmptyUserContributions();
+            if (window.App && window.App.hideLoader) window.App.hideLoader();
+            return;
+          }
+
+          const raw = snapshot.val();
+          const list = Object.keys(raw).map(key => ({
+            id: key,
+            ...raw[key]
+          }));
+
+          // Process and filter contributions
+          const userContributions = list.filter(post => {
+            // Stats counting
+            if (post.uid === targetUid) {
+              targetPostsCount++;
+            }
+            if (post.likes && post.likes[targetUid] === true) {
+              targetLikedCount++;
+            }
+            if (post.saves && post.saves[targetUid] === true) {
+              targetSavedCount++;
+            }
+
+            return post.uid === targetUid;
+          }).sort((a,b) => b.createdAt - a.createdAt);
+
+          statPostsCount.textContent = targetPostsCount;
+          statSavesCount.textContent = targetLikedCount;
+          statBookmarksCount.textContent = targetSavedCount;
+
+          if (userContributions.length === 0) {
+            renderEmptyUserContributions();
+            if (window.App && window.App.hideLoader) window.App.hideLoader();
+            return;
+          }
+
+          // Render listings
+          userContributions.forEach(post => {
+            const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+            const commentsCount = post.comments ? Object.keys(post.comments).length : 0;
+            const savesCount = post.saves ? Object.keys(post.saves).length : 0;
+
+            const isLiked = currentUid && post.likes && post.likes[currentUid] === true;
+            const isSaved = currentUid && post.saves && post.saves[currentUid] === true;
+
+            const postCard = document.createElement("div");
+            postCard.className = "glass-card post-card";
+
+            let imgHTML = "";
+            if (post.image) {
+              imgHTML = `
+                <div class="post-image-container">
+                  <img src="${post.image}" class="post-image" alt="Artwork attachment" referrerpolicy="no-referrer">
+                </div>
+              `;
+            }
+
+            postCard.innerHTML = `
+              <div class="post-header">
+                <div class="post-meta">
+                  <span class="community-badge">c/${post.communityName}</span>
+                  <span class="post-time">${window.App.formatRelativeTime(post.createdAt)}</span>
+                </div>
+              </div>
+
+              <a href="post.html?id=${post.id}" class="post-title">${escapeHTML(post.title)}</a>
+              <p class="post-content">${escapeHTML(post.content)}</p>
+              ${imgHTML}
+
+              <div class="post-actions">
+                <button class="action-btn like-btn ${isLiked ? 'active' : ''}" data-post-id="${post.id}">
+                  <i data-lucide="heart"></i>
+                  <span>${likesCount}</span>
+                </button>
+                <a href="comments.html?id=${post.id}" class="action-btn">
+                  <i data-lucide="message-square"></i>
+                  <span>${commentsCount}</span>
+                </a>
+                <button class="action-btn save-btn ${isSaved ? 'active' : ''}" data-post-id="${post.id}">
+                  <i data-lucide="bookmark"></i>
+                  <span>${savesCount}</span>
+                </button>
+              </div>
+            `;
+
+            userPostList.appendChild(postCard);
+
+            postCard.querySelector(".like-btn").addEventListener("click", () => handlePostToggle(post.id, "likes", isLiked));
+            postCard.querySelector(".save-btn").addEventListener("click", () => handlePostToggle(post.id, "saves", isSaved));
+          });
+
+          window.lucide.createIcons();
+          if (window.App && window.App.hideLoader) window.App.hideLoader();
+        });
+      }
+
+      async function handlePostToggle(postId, type, isActive) {
+        if (!currentUid) {
+          window.App.showToast("Auth keys missing.", "error");
+          return;
+        }
+
+        const actRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/${type}/${currentUid}`);
+        try {
+          if (isActive) {
+            await remove(actRef);
+          } else {
+            await set(actRef, true);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      function renderEmptyUserContributions() {
+        userPostList.innerHTML = `
+          <div class="glass-card empty-state" style="padding: 24px;">
+            <i data-lucide="compass-off"></i>
+            <h3>No Contributions Broadcasted</h3>
+            <p>This user has not broadcast any streams on this channel yet.</p>
+          </div>
+        `;
+        window.lucide.createIcons();
+      }
+
+      function escapeHTML(str) {
+        if (!str) return "";
+        return str.replace(/[&<>'"]/g, 
+          tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+          }[tag] || tag)
+        );
+      }
+    });
+  </script>
+</body>
+</html>

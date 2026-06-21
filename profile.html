@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Profile</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <div class="glass-card" id="profile-card-uid" style="display: flex; flex-direction: column; align-items: center;">
+      
+      <!-- Profiler Header -->
+      <div class="profile-info-header" id="profile-header-loader">
+        <div class="avatar-bubble lg" id="user-avatar-char" style="overflow: hidden;">U</div>
+        <h2 class="profile-name" id="user-display-name">Loading...</h2>
+        <p class="profile-username" id="user-display-username">u/loading</p>
+        <p class="profile-email" id="user-display-email"><i data-lucide="mail" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ...</p>
+        <p class="profile-uid" style="opacity:0.6; font-size:10px;" id="user-display-uid">UID: ...</p>
+        
+        <div style="margin-top: 10px; display: flex; gap: 8px;" id="user-display-status">
+          <span style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.25); color: var(--success); padding: 4px 10px; border-radius: 20px; font-size: 11px;">
+            <i data-lucide="shield-check" style="width:11px; height:11px; display:inline-block; vertical-align:middle;"></i> Verified Citizen
+          </span>
+        </div>
+      </div>
+
+      <!-- Live Statistics Grid -->
+      <div class="stats-grid w-full">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-posts-count">0</div>
+          <div class="stat-label">My Posts</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-saved-count">0</div>
+          <div class="stat-label">Saved</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-liked-count">0</div>
+          <div class="stat-label">Liked</div>
+        </div>
+      </div>
+
+      <!-- Interaction Panel Links -->
+      <div style="display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 14px;">
+        <a href="my-posts.html" class="btn w-full">
+          <i data-lucide="edit-3"></i> My Posts & Contributions
+        </a>
+        <a href="saved-posts.html" class="btn w-full">
+          <i data-lucide="bookmark"></i> Saved Bookmarks
+        </a>
+        <a href="edit-profile.html" class="btn w-full">
+          <i data-lucide="settings"></i> Edit Profile Name
+        </a>
+        <button class="btn btn-danger w-full" id="btn-profile-logout">
+          <i data-lucide="log-out"></i> Log Out Profile
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, get, onValue } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const userAvatarChar = document.getElementById("user-avatar-char");
+      const userDisplayName = document.getElementById("user-display-name");
+      const userDisplayUsername = document.getElementById("user-display-username");
+      const userDisplayEmail = document.getElementById("user-display-email");
+      const userDisplayUid = document.getElementById("user-display-uid");
+      const userDisplayStatus = document.getElementById("user-display-status");
+
+      // Stats
+      const statPostsCount = document.getElementById("stat-posts-count");
+      const statSavedCount = document.getElementById("stat-saved-count");
+      const statLikedCount = document.getElementById("stat-liked-count");
+
+      const btnLogout = document.getElementById("btn-profile-logout");
+
+      onAuthStateChanged(window.App.auth, async (user) => {
+        if (!user) return; // Guard in app.js takes care of login redirect
+
+        // 1. Populate Profile Details
+        const userProfileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${user.uid}`);
+        try {
+          const snapshot = await get(userProfileRef);
+          if (snapshot.exists()) {
+            const profile = snapshot.val();
+            userDisplayName.textContent = profile.fullName;
+            userDisplayUsername.textContent = `u/${profile.username}`;
+            const picUrl = profile.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(profile.username || 'U')}`;
+            userAvatarChar.innerHTML = `<img src="${picUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">`;
+          } else {
+            userDisplayName.textContent = user.displayName || "Cryptic User";
+            userDisplayUsername.textContent = "u/unknown";
+            userAvatarChar.innerHTML = `<img src="https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">`;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
+        userDisplayEmail.innerHTML = `<i data-lucide="mail" style="width:12px; height:12px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> ${user.email}`;
+        userDisplayUid.textContent = `UID: ${user.uid}`;
+
+        // 2. Statistics Counter Listener (calculates relative counts on posts stream)
+        const postsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts`);
+        onValue(postsRef, (snapshot) => {
+          let userPostsCount = 0;
+          let userSavedCount = 0;
+          let userLikedCount = 0;
+
+          if (snapshot.exists()) {
+            const list = snapshot.val();
+            Object.keys(list).forEach(key => {
+              const post = list[key];
+              // Matches creation
+              if (post.uid === user.uid) {
+                userPostsCount++;
+              }
+              // Matches bookmark
+              if (post.saves && post.saves[user.uid] === true) {
+                userSavedCount++;
+              }
+              // Matches likeness upvotes
+              if (post.likes && post.likes[user.uid] === true) {
+                userLikedCount++;
+              }
+            });
+          }
+
+          statPostsCount.textContent = userPostsCount;
+          statSavedCount.textContent = userSavedCount;
+          statLikedCount.textContent = userLikedCount;
+          if (window.App && window.App.hideLoader) window.App.hideLoader();
+        });
+
+        window.lucide.createIcons();
+      });
+
+      btnLogout.addEventListener("click", () => {
+        window.App.showToast("De-authenticating credentials...", "info");
+        setTimeout(() => {
+          window.App.signOutUser();
+        }, 1200);
+      });
+    });
+  </script>
+</body>
+</html>

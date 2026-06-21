@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Global Search</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <!-- Search Row Input -->
+    <div class="feed-filter-bar">
+      <div class="search-container-inline">
+        <i data-lucide="search" class="search-icon-fixed"></i>
+        <input type="text" id="global-search-input" class="input-glass w-full" placeholder="Search across AMIT nodes...">
+      </div>
+    </div>
+
+    <!-- Category selector tabs -->
+    <div class="glass-card" style="padding: 12px; border-radius:18px;">
+      <div class="tab-headers">
+        <div class="tab-header active" id="tab-posts" data-category="posts"><i data-lucide="text-quote" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Posts</div>
+        <div class="tab-header" id="tab-users" data-category="users"><i data-lucide="users" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Users</div>
+        <div class="tab-header" id="tab-communities" data-category="communities"><i data-lucide="compass" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:4px;"></i> Communities</div>
+      </div>
+    </div>
+
+    <!-- Results stream -->
+    <div id="search-results-list" class="results-list" style="width: 100%;">
+      <!-- Empty baseline -->
+      <div class="glass-card empty-state" style="padding: 30px;">
+        <i data-lucide="search-code"></i>
+        <h3>Awaiting Search Parameters</h3>
+        <p>Type in keywords above to initiate matching across the system.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, get } from "firebase/database";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const searchInput = document.getElementById("global-search-input");
+      const resultsContainer = document.getElementById("search-results-list");
+      const tabs = document.querySelectorAll(".tab-header");
+
+      let activeCategory = "posts";
+      let cache = {
+        posts: [],
+        users: [],
+        communities: []
+      };
+
+      // Tab switcher toggler handler
+      tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          tabs.forEach(t => t.classList.remove("active"));
+          tab.classList.add("active");
+          activeCategory = tab.dataset.category;
+          triggerSearch();
+        });
+      });
+
+      // Quick query lookup triggers
+      searchInput.addEventListener("input", () => {
+        triggerSearch();
+      });
+
+      async function triggerSearch() {
+        const query = searchInput.value.toLowerCase().trim();
+        if (!query) {
+          resultsContainer.innerHTML = `
+            <div class="glass-card empty-state" style="padding: 30px;">
+              <i data-lucide="search-code"></i>
+              <h3>Awaiting Search Parameters</h3>
+              <p>Type in keywords above to initiate matching across the system.</p>
+            </div>
+          `;
+          window.lucide.createIcons();
+          return;
+        }
+
+        // Render skeleton shimmer loader
+        resultsContainer.innerHTML = `
+          <div class="glass-card shimmer" style="height: 80px; width:100%; border-radius:16px;"></div>
+          <div class="glass-card shimmer" style="height: 80px; width:100%; border-radius:16px; margin-top:10px;"></div>
+        `;
+
+        try {
+          // Sync dataset lazily
+          await syncCacheForCategory(activeCategory);
+          const matched = filterResults(cache[activeCategory], query, activeCategory);
+          renderResults(matched, activeCategory);
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Bottleneck reading records.", "error");
+        }
+      }
+
+      // Sync categories
+      async function syncCacheForCategory(category) {
+        if (cache[category].length > 0) return; // Use cached details to keep RTDB quotes minimal
+
+        const targetRef = ref(window.App.db, `${window.App.DB_ROOT}/${category}`);
+        const snap = await get(targetRef);
+        
+        if (snap.exists()) {
+          const raw = snap.val();
+          cache[category] = Object.keys(raw).map(key => ({
+            id: key,
+            ...raw[key]
+          }));
+        }
+      }
+
+      // Local search algorithm wrapper
+      function filterResults(list, query, category) {
+        if (category === "posts") {
+          return list.filter(post => 
+            post.title.toLowerCase().includes(query) || 
+            post.content.toLowerCase().includes(query) ||
+            post.username.toLowerCase().includes(query)
+          );
+        } else if (category === "users") {
+          return list.filter(user => 
+            user.fullName.toLowerCase().includes(query) || 
+            user.username.toLowerCase().includes(query)
+          );
+        } else if (category === "communities") {
+          return list.filter(comm => 
+            comm.name.toLowerCase().includes(query) || 
+            comm.description.toLowerCase().includes(query)
+          );
+        }
+        return [];
+      }
+
+      function renderResults(list, category) {
+        resultsContainer.innerHTML = "";
+
+        if (list.length === 0) {
+          resultsContainer.innerHTML = `
+            <div class="glass-card empty-state" style="padding: 30px;">
+              <i data-lucide="frown"></i>
+              <h3>No match records found</h3>
+              <p>Your search parameter returned no traces in c/${category}.</p>
+            </div>
+          `;
+          window.lucide.createIcons();
+          return;
+        }
+
+        list.forEach(item => {
+          if (category === "posts") {
+            const authorAvatar = item.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(item.username || 'P')}`;
+            const card = document.createElement("a");
+            card.href = `post.html?id=${item.id}`;
+            card.className = "user-row";
+            card.innerHTML = `
+              <div class="row-info">
+                <span class="avatar-bubble" style="width:34px; height:34px; font-size:14px; flex-shrink:0; overflow:hidden;">
+                  <img src="${authorAvatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+                </span>
+                <div>
+                  <div class="row-label">${escapeHTML(item.title)}</div>
+                  <div class="row-sub">c/${item.communityName} • u/${item.username}</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="color:var(--text-muted);"></i>
+            `;
+            resultsContainer.appendChild(card);
+          } else if (category === "users") {
+            const userAvatar = item.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(item.username || 'U')}`;
+            const card = document.createElement("a");
+            card.href = `profile-view.html?id=${item.id}`;
+            card.className = "user-row";
+            card.innerHTML = `
+              <div class="row-info">
+                <span class="avatar-bubble" style="width:38px; height:38px; font-size:16px; flex-shrink:0; overflow:hidden;">
+                  <img src="${userAvatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+                </span>
+                <div>
+                  <div class="row-label">${escapeHTML(item.fullName)}</div>
+                  <div class="row-sub">u/${item.username}</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="color:var(--text-muted);"></i>
+            `;
+            resultsContainer.appendChild(card);
+          } else if (category === "communities") {
+            const card = document.createElement("a");
+            card.href = `community.html?id=${item.id}`;
+            card.className = "community-row";
+            card.innerHTML = `
+              <div class="row-info">
+                <span class="avatar-bubble" style="width:38px; height:38px; font-size:16px; flex-shrink:0; background:linear-gradient(135deg, #a855f7 0%,#a855f7 100%);">
+                  C
+                </span>
+                <div>
+                  <div class="row-label">c/${item.name}</div>
+                  <div class="row-sub">${escapeHTML(item.description)}</div>
+                </div>
+              </div>
+              <i data-lucide="chevron-right" style="color:var(--text-muted);"></i>
+            `;
+            resultsContainer.appendChild(card);
+          }
+        });
+
+        window.lucide.createIcons();
+      }
+
+      function escapeHTML(str) {
+        if (!str) return "";
+        return str.replace(/[&<>'"]/g, 
+          tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+          }[tag] || tag)
+        );
+      }
+    });
+  </script>
+</body>
+</html>

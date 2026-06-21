@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Private Messages</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <div class="chat-container">
+      
+      <!-- PANE 1: Chat List Inbox & New Chat Finder -->
+      <div class="chat-list-pane" id="chat-list-pane-id">
+        <div class="chat-list-header">
+          <h2 style="font-size: 18px; color: white; font-weight: 600; letter-spacing: 0.5px;">Direct Messages</h2>
+          <input type="text" id="chat-search-input-id" class="chat-search-input" placeholder="Search members to start chatting...">
+        </div>
+        
+        <!-- Live Chat List Scroll Area -->
+        <div class="chat-list-scroll" id="chat-list-scroll-id">
+          <div style="padding: 40px; text-align: center; color: var(--text-muted); font-size: 13px;">
+            <i data-lucide="message-square" style="width: 24px; height: 24px; margin: 0 auto 10px; opacity: 0.5;"></i>
+            <p>Gathering conversations...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 2: Individual Conversation View -->
+      <div class="chat-view-pane" id="chat-view-pane-id" style="display: none;">
+        <!-- Header details of chat recipient -->
+        <div class="chat-view-header">
+          <div style="display: flex; align-items: center; flex: 1;">
+            <button class="chat-back-btn" id="chat-back-btn-id" title="Back to Direct Messages Inbox">
+              <i data-lucide="arrow-left" style="width: 18px; height: 18px;"></i>
+            </button>
+            <div class="chat-partner">
+              <span id="chat-partner-avatar-id" class="avatar-bubble" style="width:34px; height:34px; font-size:12px; overflow:hidden;">
+                <!-- Loaded dynamically -->
+              </span>
+              <div>
+                <div id="chat-partner-name-id" class="chat-partner-name">Loading Member...</div>
+                <div id="chat-partner-user-id" class="chat-partner-user">u/loading</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scrollable messaging track -->
+        <div class="chat-msg-area" id="chat-msg-area-id">
+          <!-- Loaded dynamically -->
+        </div>
+
+        <!-- Composer text input bar -->
+        <form class="chat-composer" id="chat-composer-id" onsubmit="return false;">
+          <input type="text" id="chat-composer-input-id" class="chat-composer-input" placeholder="Type your message..." autocomplete="off">
+          <button type="submit" id="chat-send-btn-id" class="chat-send-btn">
+            <span>Send</span>
+            <i data-lucide="send" style="width: 14px; height: 14px;"></i>
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & Firebase module SDK connections -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, get, set, push, onValue, off, update } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      let currentUid = null;
+      let currentProfile = null;
+      let allUsers = [];
+      let activeRoomId = null;
+      let activeRoomListenerRef = null;
+      let selectedRecipientUid = null;
+      let selectedRecipientProfile = null;
+
+      const chatListPane = document.getElementById("chat-list-pane-id");
+      const chatViewPane = document.getElementById("chat-view-pane-id");
+      
+      const chatSearchInput = document.getElementById("chat-search-input-id");
+      const chatListScroll = document.getElementById("chat-list-scroll-id");
+      
+      const chatBackBtn = document.getElementById("chat-back-btn-id");
+      const chatPartnerAvatar = document.getElementById("chat-partner-avatar-id");
+      const chatPartnerName = document.getElementById("chat-partner-name-id");
+      const chatPartnerUser = document.getElementById("chat-partner-user-id");
+      
+      const chatMsgArea = document.getElementById("chat-msg-area-id");
+      const chatComposerForm = document.getElementById("chat-composer-id");
+      const chatComposerInput = document.getElementById("chat-composer-input-id");
+      const chatSendBtn = document.getElementById("chat-send-btn-id");
+
+      // Verify Auth Status
+      onAuthStateChanged(window.App.auth, async (user) => {
+        if (user) {
+          currentUid = user.uid;
+          
+          // Fetch current user details
+          const myProfileRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${user.uid}`);
+          const myProfileSnap = await get(myProfileRef);
+          if (myProfileSnap.exists()) {
+            currentProfile = myProfileSnap.val();
+          } else {
+            currentProfile = {
+              uid: user.uid,
+              fullName: "Matrix Citizen",
+              username: user.email ? user.email.split("@")[0] : "citizen",
+              profilePicture: `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`
+            };
+          }
+
+          // Initial user collection for direct start
+          loadUsersList();
+          
+          // Initial Inbox listener
+          initInboxListener();
+
+          // Check for URL query parameter target redirection
+          const urlParams = new URLSearchParams(window.location.search);
+          const targetUserUid = urlParams.get("target");
+          if (targetUserUid) {
+            setupWithRecipient(targetUserUid);
+          }
+        }
+      });
+
+      // Load all platform users to allow new chats search
+      async function loadUsersList() {
+        const usersRef = ref(window.App.db, `${window.App.DB_ROOT}/users`);
+        try {
+          const snapshot = await get(usersRef);
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            allUsers = Object.keys(data)
+              .map(key => ({ uid: key, ...data[key] }))
+              .filter(u => u.uid !== currentUid);
+          }
+        } catch (e) {
+          console.error("Failed loading platform users cache:", e);
+        }
+      }
+
+      // Initialize real-time list of active DMs for current user
+      function initInboxListener() {
+        const inboxRef = ref(window.App.db, `${window.App.DB_ROOT}/user_chats/${currentUid}`);
+        onValue(inboxRef, (snapshot) => {
+          // If seeking users, don't override search lists
+          if (chatSearchInput.value.trim().length > 0) {
+            return;
+          }
+
+          if (!snapshot.exists()) {
+            renderEmptyInbox();
+            if (window.App && window.App.hideLoader) window.App.hideLoader();
+            return;
+          }
+
+          const inboxData = snapshot.val();
+          // Convert to sorted conversations by timestamp (newest first)
+          const rooms = Object.keys(inboxData).map(key => ({
+            recipientId: key,
+            ...inboxData[key]
+          })).sort((a, b) => b.timestamp - a.timestamp);
+
+          renderInbox(rooms);
+          if (window.App && window.App.hideLoader) window.App.hideLoader();
+        });
+      }
+
+      function renderEmptyInbox() {
+        chatListScroll.innerHTML = `
+          <div style="padding: 60px 40px; text-align: center; color: var(--text-muted);">
+            <div style="width: 56px; height: 56px; border-radius: 50%; border: 1px dashed var(--glass-border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+              <i data-lucide="message-square" style="width: 22px; height: 22px; color: var(--text-secondary);"></i>
+            </div>
+            <h3 style="color: white; font-size: 14px; font-weight: 500; margin-bottom: 4px;">Welcome to DMs</h3>
+            <p style="font-size: 11px; max-width: 240px; margin: 0 auto;">Search for members above or visit their profiles to initiate a secret communication node.</p>
+          </div>
+        `;
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      function renderInbox(rooms) {
+        chatListScroll.innerHTML = "";
+        rooms.forEach(room => {
+          const div = document.createElement("div");
+          div.className = "chat-item";
+          div.id = `chat-room-item-${room.recipientId}`;
+          
+          const avatarUrl = room.recipientAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(room.recipientUsername)}`;
+          
+          const hasUnread = room.unreadCount > 0;
+          const unreadBadgeHtml = hasUnread 
+            ? `<span class="chat-item-unread-badge" style="background:#ffffff; color:#000000; font-size:10px; font-weight:bold; font-family:'Share Tech Mono', monospace; border-radius:10px; padding:2px 7px; display:inline-flex; align-items:center; justify-content:center; box-shadow: 0 0 8px rgba(255,255,255,0.3); float:right; margin-left:4px;">${room.unreadCount}</span>` 
+            : "";
+
+          div.innerHTML = `
+            <span class="avatar-bubble" style="width: 40px; height: 40px; overflow: hidden; flex-shrink: 0; border: 1px solid var(--glass-border);">
+              <img src="${avatarUrl}" alt="Profile avatar" style="width:100%; height:100%; object-fit:cover;" referrerpolicy="no-referrer">
+            </span>
+            <div class="chat-item-info" style="width: calc(100% - 52px);">
+              <div class="chat-item-name" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>${escapeHTML(room.recipientName)}</span>
+                ${unreadBadgeHtml}
+              </div>
+              <div class="chat-item-meta" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span class="chat-item-msg" style="flex:1; min-width:0; ${hasUnread ? 'font-weight:700; color:#ffffff;' : ''}">${escapeHTML(room.lastMessage || "")}</span>
+                <span class="chat-item-time" style="flex-shrink:0;">${getChatRelativeOrAbsoluteDate(room.timestamp, false)}</span>
+              </div>
+            </div>
+          `;
+
+          div.addEventListener("click", () => {
+            setupWithRecipient(room.recipientId);
+          });
+
+          chatListScroll.appendChild(div);
+        });
+      }
+
+      // Handle typing search
+      chatSearchInput.addEventListener("input", (e) => {
+        const val = e.target.value.trim().toLowerCase();
+        
+        if (val.length === 0) {
+          // Re-trigger standard Inbox
+          initInboxListener();
+          return;
+        }
+
+        // Search in users
+        const matches = allUsers.filter(u => 
+          (u.fullName && u.fullName.toLowerCase().includes(val)) ||
+          (u.username && u.username.toLowerCase().includes(val))
+        );
+
+        renderUsersSearchResults(matches);
+      });
+
+      function renderUsersSearchResults(results) {
+        chatListScroll.innerHTML = "";
+        
+        if (results.length === 0) {
+          chatListScroll.innerHTML = `
+            <div style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 12px;">
+              <p>No members match your criteria</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Header for results
+        const subtitle = document.createElement("div");
+        subtitle.style.cssText = "font-size: 11px; padding: 4px 6px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;";
+        subtitle.innerText = "System Registry Search Results";
+        chatListScroll.appendChild(subtitle);
+
+        results.forEach(u => {
+          const div = document.createElement("div");
+          div.className = "chat-item";
+          
+          const avatarUrl = u.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(u.username)}`;
+          
+          div.innerHTML = `
+            <span class="avatar-bubble" style="width: 40px; height: 40px; overflow: hidden; flex-shrink: 0; border: 1px solid var(--glass-border);">
+              <img src="${avatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover;" referrerpolicy="no-referrer">
+            </span>
+            <div class="chat-item-info">
+              <div class="chat-item-name" style="margin-bottom:0;">${escapeHTML(u.fullName)}</div>
+              <div style="font-size:11px; color:var(--text-secondary);">u/${escapeHTML(u.username)}</div>
+            </div>
+          `;
+
+          div.addEventListener("click", () => {
+            // Initiate DM with this user
+            setupWithRecipient(u.uid);
+            chatSearchInput.value = ""; // reset search bar
+          });
+
+          chatListScroll.appendChild(div);
+        });
+      }
+
+      // Transition and Load direct conversation with recipient
+      async function setupWithRecipient(recipientUid) {
+        selectedRecipientUid = recipientUid;
+        
+        // Fetch recipient particulars first
+        const userRef = ref(window.App.db, `${window.App.DB_ROOT}/users/${recipientUid}`);
+        try {
+          const snap = await get(userRef);
+          if (snap.exists()) {
+            selectedRecipientProfile = snap.val();
+          } else {
+            selectedRecipientProfile = {
+              fullName: "Matrix Citizen",
+              username: "legacy_user",
+              profilePicture: ""
+            };
+          }
+        } catch (e) {
+          console.error("Failed fetching partner details:", e);
+          selectedRecipientProfile = {
+            fullName: "Matrix Citizen",
+            username: "legacy_user",
+            profilePicture: ""
+          };
+        }
+
+        // Render target card header
+        chatPartnerName.innerText = selectedRecipientProfile.fullName;
+        chatPartnerUser.innerText = `u/${selectedRecipientProfile.username}`;
+        
+        const avatarUrl = selectedRecipientProfile.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(selectedRecipientProfile.username)}`;
+        chatPartnerAvatar.innerHTML = `<img src="${avatarUrl}" alt="Recipient" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">`;
+
+        // Resolve shared unique roomId deterministically
+        activeRoomId = [currentUid, recipientUid].sort().join("_");
+
+        // Clear existing messages listener if present
+        if (activeRoomListenerRef) {
+          off(activeRoomListenerRef);
+        }
+
+        // View Transition: Hide list, slide in conversation room
+        chatListPane.style.display = "none";
+        
+        chatViewPane.style.opacity = "0";
+        chatViewPane.style.transform = "translateY(5px)";
+        chatViewPane.style.display = "flex";
+        
+        // Trigger style reflow for animated transition
+        setTimeout(() => {
+          chatViewPane.style.transition = "opacity 0.22s ease-out, transform 0.22s ease-out";
+          chatViewPane.style.opacity = "1";
+          chatViewPane.style.transform = "translateY(0)";
+        }, 10);
+
+        // Reset unread count for this room immediately
+        const myChatInboxItemRef = ref(window.App.db, `${window.App.DB_ROOT}/user_chats/${currentUid}/${recipientUid}/unreadCount`);
+        set(myChatInboxItemRef, 0);
+
+        // Load Messages Realtime Engine
+        const msgRef = ref(window.App.db, `${window.App.DB_ROOT}/direct_chats/${activeRoomId}/messages`);
+        activeRoomListenerRef = msgRef;
+
+        onValue(msgRef, (snapshot) => {
+          // Keep unread count at 0 while in active chat view with recipient
+          set(ref(window.App.db, `${window.App.DB_ROOT}/user_chats/${currentUid}/${recipientUid}/unreadCount`), 0);
+
+          if (!snapshot.exists()) {
+            renderEmptyConversation();
+            return;
+          }
+
+          const msgsData = snapshot.val();
+          const msgsList = Object.keys(msgsData)
+            .map(k => ({ id: k, ...msgsData[k] }))
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+          renderConversation(msgsList);
+        });
+
+        chatComposerInput.focus();
+      }
+
+      function renderEmptyConversation() {
+        chatMsgArea.innerHTML = `
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px; text-align:center; color: var(--text-muted);">
+            <div style="width: 44px; height: 44px; border-radius:50%; border: 1px dashed var(--glass-border); display:flex; align-items:center; justify-content:center; margin-bottom:12px;">
+              <i data-lucide="message-circle" style="width:18px; height:18px; color: var(--text-secondary);"></i>
+            </div>
+            <h4 style="color:white; font-size:12px; font-weight:500; margin-bottom: 2px;">End-to-End Handshake Complete</h4>
+            <p style="font-size:10px;">Be the first to transmit a payload to u/${escapeHTML(selectedRecipientProfile.username)}.</p>
+          </div>
+        `;
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }
+
+      function renderConversation(messages) {
+        chatMsgArea.innerHTML = "";
+        let lastDateHeader = "";
+
+        messages.forEach(msg => {
+          const currentDateHeader = getOnlyDateHeader(msg.timestamp);
+          if (currentDateHeader !== lastDateHeader) {
+            const separator = document.createElement("div");
+            separator.className = "chat-date-separator";
+            separator.innerText = currentDateHeader;
+            chatMsgArea.appendChild(separator);
+            lastDateHeader = currentDateHeader;
+          }
+
+          const div = document.createElement("div");
+          const isMe = msg.senderId === currentUid;
+          div.className = `msg-bubble ${isMe ? 'sent' : 'received'}`;
+          
+          const timeString = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          div.innerHTML = `
+            <div class="msg-content">${escapeHTML(msg.text)}</div>
+            <div class="msg-meta">${timeString}</div>
+          `;
+
+          chatMsgArea.appendChild(div);
+        });
+
+        // Ensure scrolling stays glued to bottom message
+        chatMsgArea.scrollTop = chatMsgArea.scrollHeight;
+      }
+
+      // Handle message transmission
+      chatComposerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = chatComposerInput.value.trim();
+        if (text.length === 0) return;
+
+        chatComposerInput.value = "";
+        
+        const timestamp = Date.now();
+        const messagesRef = ref(window.App.db, `${window.App.DB_ROOT}/direct_chats/${activeRoomId}/messages`);
+        
+        // Push message record to shared room history
+        const newMsgRef = push(messagesRef);
+        await set(newMsgRef, {
+          senderId: currentUid,
+          text: text,
+          timestamp: timestamp
+        });
+
+        // Update shared room metadata lastMessage
+        const roomMetaRef = ref(window.App.db, `${window.App.DB_ROOT}/direct_chats/${activeRoomId}/lastMessage`);
+        await set(roomMetaRef, {
+          text: text,
+          timestamp: timestamp,
+          senderId: currentUid
+        });
+
+        // Seed indices for sender DM inbox view (always 0 unread for the sender)
+        const senderInboxRef = ref(window.App.db, `${window.App.DB_ROOT}/user_chats/${currentUid}/${selectedRecipientUid}`);
+        await set(senderInboxRef, {
+          recipientId: selectedRecipientUid,
+          recipientName: selectedRecipientProfile.fullName,
+          recipientUsername: selectedRecipientProfile.username,
+          recipientAvatar: selectedRecipientProfile.profilePicture || "",
+          lastMessage: text,
+          timestamp: timestamp,
+          senderId: currentUid,
+          unreadCount: 0
+        });
+
+        // Seed indices for recipient DM inbox view (increment unreadCount by 1)
+        const recipientInboxRef = ref(window.App.db, `${window.App.DB_ROOT}/user_chats/${selectedRecipientUid}/${currentUid}`);
+        let recipientUnread = 0;
+        try {
+          const snapRecipient = await get(recipientInboxRef);
+          if (snapRecipient.exists()) {
+            const recVal = snapRecipient.val();
+            recipientUnread = recVal.unreadCount || 0;
+          }
+        } catch (err) {
+          console.error("Failed to fetch recipient unread cache:", err);
+        }
+
+        await set(recipientInboxRef, {
+          recipientId: currentUid,
+          recipientName: currentProfile.fullName,
+          recipientUsername: currentProfile.username,
+          recipientAvatar: currentProfile.profilePicture || "",
+          lastMessage: text,
+          timestamp: timestamp,
+          senderId: currentUid,
+          unreadCount: recipientUnread + 1
+        });
+      });
+
+      // Navigate back to core DMs list page
+      chatBackBtn.addEventListener("click", () => {
+        // Clear active conversation room listeners
+        if (activeRoomListenerRef) {
+          off(activeRoomListenerRef);
+          activeRoomListenerRef = null;
+        }
+
+        // Wipe selection
+        activeRoomId = null;
+        selectedRecipientUid = null;
+        selectedRecipientProfile = null;
+
+        // View Transition: Wipe room, reveal Inbox
+        chatViewPane.style.display = "none";
+        
+        chatListPane.style.opacity = "0";
+        chatListPane.style.transform = "translateY(5px)";
+        chatListPane.style.display = "flex";
+        
+        setTimeout(() => {
+          chatListPane.style.transition = "opacity 0.22s ease-out, transform 0.22s ease-out";
+          chatListPane.style.opacity = "1";
+          chatListPane.style.transform = "translateY(0)";
+        }, 10);
+
+        // Remove parameters from URL bar elegantly so navigation is clean
+        const url = new URL(window.location);
+        url.searchParams.delete("target");
+        window.history.pushState({}, '', url);
+
+        // Re-run Inbox
+        initInboxListener();
+      });
+
+      // Escape helper prevents vector script executions
+      function escapeHTML(str) {
+        if (!str) return "";
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      // Convert timestamps to human-friendly "Today / Yesterday / Date" options
+      function getChatRelativeOrAbsoluteDate(timestamp, isMessage = false) {
+        if (!timestamp) return "";
+        const date = new Date(timestamp);
+        const now = new Date();
+
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterdayMidnight = todayMidnight - 24 * 60 * 60 * 1000;
+
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        if (timestamp >= todayMidnight) {
+          return isMessage ? `Today at ${timeStr}` : `Today, ${timeStr}`;
+        } else if (timestamp >= yesterdayMidnight) {
+          return isMessage ? `Yesterday at ${timeStr}` : `Yesterday, ${timeStr}`;
+        } else {
+          const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+          return isMessage ? `${dateStr} at ${timeStr}` : dateStr;
+        }
+      }
+
+      function getOnlyDateHeader(timestamp) {
+        if (!timestamp) return "";
+        const date = new Date(timestamp);
+        const now = new Date();
+
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterdayMidnight = todayMidnight - 24 * 60 * 60 * 1000;
+
+        if (timestamp >= todayMidnight) {
+          return "Today";
+        } else if (timestamp >= yesterdayMidnight) {
+          return "Yesterday";
+        } else {
+          return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+      }
+    });
+  </script>
+</body>
+</html>

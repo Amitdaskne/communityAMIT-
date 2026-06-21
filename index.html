@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunityAMIT - Realtime Portal</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- Shared Header -->
+  <div id="header-placeholder"></div>
+
+  <div class="app-container" style="margin-top: 10px;">
+    <!-- Search Bar -->
+    <div class="feed-filter-bar">
+      <div class="search-container-inline">
+        <i data-lucide="search" class="search-icon-fixed"></i>
+        <input type="text" id="feed-search-input" class="input-glass w-full" placeholder="Realtime search posts...">
+      </div>
+      <a href="create-post.html" class="btn btn-primary btn-sm" id="btn-quick-create">
+        <i data-lucide="plus"></i> New Post
+      </a>
+    </div>
+
+    <!-- Posts Container Feed -->
+    <div id="feed-posts-container" style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+      <!-- Shimmer skeletons while loading state -->
+      <div class="glass-card shimmer shimmer-card"></div>
+      <div class="glass-card shimmer shimmer-card"></div>
+    </div>
+  </div>
+
+  <!-- Shared Footer & Bottom Navigation -->
+  <div id="footer-placeholder"></div>
+  <div id="nav-placeholder"></div>
+
+  <!-- App logic & SDK modules -->
+  <script type="module" src="/src/js/app.js"></script>
+  <script type="module">
+    import { ref, onValue, set, remove, get } from "firebase/database";
+    import { onAuthStateChanged } from "firebase/auth";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      let currentUid = null;
+      const postsContainer = document.getElementById("feed-posts-container");
+      const searchInput = document.getElementById("feed-search-input");
+      let allPosts = []; // Local cache for realtime search
+
+      // Get current auth state to draw liked/saved states correctly
+      onAuthStateChanged(window.App.auth, (user) => {
+        if (user) {
+          currentUid = user.uid;
+        }
+        initFeedListener();
+      });
+
+      function initFeedListener() {
+        const postsRef = ref(window.App.db, `${window.App.DB_ROOT}/posts`);
+        
+        onValue(postsRef, (snapshot) => {
+          if (!snapshot.exists()) {
+            renderEmptyState();
+            if (window.App && window.App.hideLoader) window.App.hideLoader();
+            return;
+          }
+
+          const rawData = snapshot.val();
+          // Convert object list to sorted array (latest first)
+          allPosts = Object.keys(rawData).map(key => ({
+            id: key,
+            ...rawData[key]
+          })).sort((a, b) => b.createdAt - a.createdAt);
+
+          renderFeed(allPosts);
+          if (window.App && window.App.hideLoader) window.App.hideLoader();
+        }, (error) => {
+          console.error("Database connection failure:", error);
+          window.App.showToast("Connection failed. Check Firebase security rules.", "error");
+          if (window.App && window.App.hideLoader) window.App.hideLoader();
+        });
+      }
+
+      function renderFeed(posts) {
+        postsContainer.innerHTML = "";
+        
+        if (posts.length === 0) {
+          renderEmptyState();
+          return;
+        }
+
+        posts.forEach(post => {
+          // Calculate stats
+          const likesCount = post.likes ? Object.keys(post.likes).length : 0;
+          const commentsCount = post.comments ? Object.keys(post.comments).length : 0;
+          const savesCount = post.saves ? Object.keys(post.saves).length : 0;
+
+          const isLiked = currentUid && post.likes && post.likes[currentUid] === true;
+          const isSaved = currentUid && post.saves && post.saves[currentUid] === true;
+
+          const postCard = document.createElement("div");
+          postCard.className = "glass-card post-card";
+          postCard.id = `post-${post.id}`;
+
+          let imageHTML = "";
+          if (post.image) {
+            imageHTML = `
+              <div class="post-image-container">
+                <img src="${post.image}" class="post-image" alt="Uploaded media" referrerpolicy="no-referrer">
+              </div>
+            `;
+          }
+
+          const authorAvatar = post.profilePicture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(post.username || 'A')}`;
+
+          postCard.innerHTML = `
+            <div class="post-header">
+              <div class="post-meta">
+                <span class="avatar-bubble" style="width:28px; height:28px; font-size:12px; overflow:hidden;">
+                  <img src="${authorAvatar}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" referrerpolicy="no-referrer">
+                </span>
+                <a href="community.html?id=${encodeURIComponent(post.communityId || 'all')}" class="community-badge">
+                  c/${post.communityName || "all"}
+                </a>
+                <a href="profile-view.html?id=${post.uid}" class="author-name">
+                  u/${post.username || "anonymous"}
+                </a>
+                <span class="post-time">${window.App.formatRelativeTime(post.createdAt)}</span>
+              </div>
+            </div>
+
+            <a href="post.html?id=${post.id}" class="post-title">${escapeHTML(post.title)}</a>
+            <p class="post-content">${escapeHTML(post.content)}</p>
+            
+            ${imageHTML}
+
+            <div class="post-actions">
+              <button class="action-btn like-btn ${isLiked ? 'active' : ''}" data-post-id="${post.id}">
+                <i data-lucide="heart"></i>
+                <span class="likes-count">${likesCount}</span>
+              </button>
+              <a href="comments.html?id=${post.id}" class="action-btn">
+                <i data-lucide="message-square"></i>
+                <span>${commentsCount}</span>
+              </a>
+              <button class="action-btn save-btn ${isSaved ? 'active' : ''}" data-post-id="${post.id}">
+                <i data-lucide="bookmark"></i>
+                <span class="saves-count">${savesCount}</span>
+              </button>
+            </div>
+          `;
+
+          postsContainer.appendChild(postCard);
+
+          // Add click event to dynamic elements
+          const likeBtn = postCard.querySelector(".like-btn");
+          likeBtn.addEventListener("click", () => handleLike(post.id, isLiked));
+
+          const saveBtn = postCard.querySelector(".save-btn");
+          saveBtn.addEventListener("click", () => handleSave(post.id, isSaved));
+        });
+
+        // Refilter icons
+        window.lucide.createIcons();
+      }
+
+      function renderEmptyState() {
+        postsContainer.innerHTML = `
+          <div class="glass-card empty-state">
+            <i data-lucide="inbox"></i>
+            <h3>No Active Transmission</h3>
+            <p>The matrix is empty. Be the first to post something incredible.</p>
+            <a href="create-post.html" class="btn btn-primary mt-12 btn-sm">
+              <i data-lucide="plus-square"></i> Create Post
+            </a>
+          </div>
+        `;
+        window.lucide.createIcons();
+      }
+
+      // 7. Like Toggling Handler
+      async function handleLike(postId, isLiked) {
+        if (!currentUid) {
+          window.App.showToast("Please log in to upvote.", "error");
+          return;
+        }
+
+        const likesRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/likes/${currentUid}`);
+        try {
+          if (isLiked) {
+            await remove(likesRef);
+          } else {
+            await set(likesRef, true);
+            // Optionally, push notification to the author if it's not self-upvote
+            const authorSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/uid`));
+            if (authorSnap.exists() && authorSnap.val() !== currentUid) {
+              const uSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/users/${currentUid}/username`));
+              const myUsername = uSnap.exists() ? uSnap.val() : "Someone";
+              await window.App.pushNotification(
+                authorSnap.val(),
+                `u/${myUsername} upvoted your post!`,
+                `post.html?id=${postId}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Could not modify upvote state.", "error");
+        }
+      }
+
+      // 8. Save Toggling Handler
+      async function handleSave(postId, isSaved) {
+        if (!currentUid) {
+          window.App.showToast("Please log in to save.", "error");
+          return;
+        }
+
+        const savesRef = ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/saves/${currentUid}`);
+        try {
+          if (isSaved) {
+            await remove(savesRef);
+            window.App.showToast("Post removed from saved bookmarks.", "success");
+          } else {
+            await set(savesRef, true);
+            window.App.showToast("Post saved successfully.", "success");
+
+            // Alert post author when their broadcast is saved by someone else
+            const authorSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/posts/${postId}/uid`));
+            if (authorSnap.exists() && authorSnap.val() !== currentUid) {
+              const uSnap = await get(ref(window.App.db, `${window.App.DB_ROOT}/users/${currentUid}/username`));
+              const myUsername = uSnap.exists() ? uSnap.val() : "Someone";
+              await window.App.pushNotification(
+                authorSnap.val(),
+                `u/${myUsername} saved your post!`,
+                `post.html?id=${postId}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error(e);
+          window.App.showToast("Failed to modify save status.", "error");
+        }
+      }
+
+      // Realtime search text input matching
+      searchInput.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        if (!query) {
+          renderFeed(allPosts);
+          return;
+        }
+
+        const filtered = allPosts.filter(post => 
+          post.title.toLowerCase().includes(query) || 
+          post.content.toLowerCase().includes(query) ||
+          (post.communityName && post.communityName.toLowerCase().includes(query)) ||
+          post.username.toLowerCase().includes(query)
+        );
+
+        renderFeed(filtered);
+      });
+
+      // Quick XSS Escape helper
+      function escapeHTML(str) {
+        if (!str) return "";
+        return str.replace(/[&<>'"]/g, 
+          tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+          }[tag] || tag)
+        );
+      }
+    });
+  </script>
+</body>
+</html>
